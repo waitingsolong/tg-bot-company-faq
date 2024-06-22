@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "langflow-bench"
+version = "0.1.0"
+description = ""
+authors = ["arseniy <a.moguchii@mail.ru>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.9.7 || >3.9.7,<3.12"
+langflow = "^0.6.19"
+serpapi = "^0.1.5"
+streamlit = "^1.35.0"
+aiogram = "^3.8.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
