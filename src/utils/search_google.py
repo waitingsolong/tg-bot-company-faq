@@ -13,7 +13,7 @@ def search_google(q: str) -> list:
         list: urls
     """
     serpapi_results = client.search(
-        q="coffee",
+        q=q,
         engine="google",
         location="Austin, Texas",
         hl="en",

@@ -14,3 +14,6 @@ def init_logs():
                         handlers=HANDLERS,
     )
     
+    
+init_logs()
+    
