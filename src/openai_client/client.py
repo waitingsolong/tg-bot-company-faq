@@ -1,0 +1,144 @@
+import logging
+import asyncio
+
+from langchain_core.runnables import RunnablePassthrough
+from langchain.chains import LLMChain
+from typing import List, Tuple
+from langchain_openai import OpenAI
+from langchain_core.prompts import PromptTemplate
+from langchain_text_splitters import CharacterTextSplitter
+from langchain_chroma import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_core.output_parsers import StrOutputParser
+from langchain import hub
+from langchain_community.callbacks.manager import get_openai_callback
+from utils.logged_token_usage import log_token_usage
+from utils.logged_step import logged_step
+from langchain.schema import Document
+
+
+class OpenAIClient:
+    input_1M_token_price = {
+        "gpt-3.5-turbo-1106": 1.0,
+    }
+    
+    output_1M_token_price = {
+        "gpt-3.5-turbo-1106": 2.0,
+    }
+    
+    vector_store_cost_per_gb_per_day = 0.10
+
+    def __init__(self, api_key: str, model_name: str = "gpt-3.5-turbo-1106"):
+        if model_name not in set(OpenAIClient.input_1M_token_price.keys()).union(OpenAIClient.output_1M_token_price.keys()):
+            logging.critical(f"Input/output price for model {model_name} is not specified. Please, select allowed model")
+            raise Exception()
+                
+        self.__model_name = model_name
+        self.__llm = OpenAI(model_name=model_name, api_key=api_key)
+
+        self.__input_tokens = 0
+        self.__output_tokens = 0
+        self.__delta_input_tokens = 0
+        self.__delta_output_tokens = 0
+        self.__vector_store_size_gb = 0.0
+        
+        embeddings_model_name = "sentence-transformers/all-MiniLM-L6-v2"
+        embeddings = HuggingFaceEmbeddings(model_name=embeddings_model_name)
+        self.__vector_store = Chroma(embedding_function=embeddings)
+        self.__retriever = self.__vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 1})
+
+        # query chain 
+        # ... 
+
+        # rag chain
+        self.__rag_prompt_template = hub.pull("rlm/rag-prompt")
+        self.__rag_chain = (
+            {"context": self.__retriever | self.__format_docs, "question": RunnablePassthrough()}
+            | self.__rag_prompt_template
+            | self.__llm
+            | StrOutputParser()
+        )
+
+
+    @logged_step("OpenAIClient destructor")
+    def __del__(self):
+        logging.info("Clearing vector store")
+        self.clear_vector_store()
+        
+        cost = self.calculate_cost()
+        logging.info(f"Total cost of using ChatGPT: ${cost:.2f}")
+    
+
+    # TODO 
+    @log_token_usage("Query execution")
+    async def query(self, task: str, prompt: str):
+        """
+        Raises:
+            e: whatever
+        """
+        prompt_template = PromptTemplate(input_variables=["prompt", "task"], 
+                                         template="{task}\n\nPrompt: {prompt}")
+
+        chain = LLMChain(
+            prompt_template=prompt_template,
+            llm=self.__llm,
+            output_parser=StrOutputParser()
+        )
+        
+        chain_input = {"task": task, "prompt": prompt}
+        
+        with get_openai_callback() as cb:
+            res = await chain.arun(chain_input)
+            self.__delta_input_tokens += cb.prompt_tokens
+            self.__delta_output_tokens += cb.completion_tokens
+    
+        return res
+
+
+    def calculate_cost(self) -> float:
+        vector_store_cost = 0
+        if self.__vector_store_size_gb > 1:
+            vector_store_cost = (self.__vector_store_size_gb - 1) * self.vector_store_cost_per_gb_per_day
+            
+        return (self.__input_tokens / 1_000_000) * self.input_1M_token_price[self.__model_name] + \
+            (self.__output_tokens / 1_000_000) * self.output_1M_token_price[self.__model_name] + \
+            vector_store_cost
+
+                
+    async def add_to_vector_store(self, documents: List[str]):
+        chunk_size = 1_000
+        text_splitter = CharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=0)
+        doc_objects = [Document(page_content=doc) for doc in documents]
+        docs = text_splitter.split_documents(doc_objects)
+        await self.__vector_store.aadd_documents(docs)
+        self.__vector_store_size_gb += self.__calculate_chunks_size_gb(docs, chunk_size)
+
+
+    def __calculate_chunks_size_gb(self, chunks, chunk_size_in_bytes) -> float:
+        return len(chunks) / chunk_size_in_bytes / 1000.0
+    
+    
+    def __format_docs(docs):
+        return "\n\n".join(doc.page_content for doc in docs)
+    
+    
+    # TODO
+    @log_token_usage("Rag execution")
+    async def rag(self, question: str) -> str:
+        """
+        Raises:
+            e: whatever
+        """        
+        with get_openai_callback() as cb:
+            await self.__rag_chain.ainvoke(question)
+            self.__delta_input_tokens += cb.prompt_tokens
+            self.__delta_output_tokens += cb.completion_tokens
+
+
+    def clear_vector_store(self):
+        if not self.__vector_store: 
+            return
+        
+        self.__vector_store.delete_collection()
+        self.__vector_store_size_gb = 0
+        

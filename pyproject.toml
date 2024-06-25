@@ -7,10 +7,16 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.9.7 || >3.9.7,<3.12"
-langflow = "^0.6.19"
 serpapi = "^0.1.5"
 streamlit = "^1.35.0"
 aiogram = "^3.8.0"
+langchain-chroma = "^0.1.1"
+langchain = "^0.2.5"
+langchain-community = "^0.2.5"
+langchain-openai = "^0.1.9"
+beautifulsoup4 = "^4.12.3"
+firecrawl-py = "^0.0.16"
+langchain-huggingface = "^0.0.3"
 
 
 [build-system]

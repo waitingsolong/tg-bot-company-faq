@@ -12,3 +12,5 @@ DEBUG = bool(os.getenv("DEBUG"))
 
 REDIS_HOST = os.getenv("REDIS_HOST")
 REDIS_PORT = os.getenv("REDIS_PORT") 
+
+FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY") 

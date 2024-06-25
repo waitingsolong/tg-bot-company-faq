@@ -11,6 +11,9 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.filters import StateFilter
 from redis.asyncio.client import Redis
 from aiogram.fsm.storage.redis import RedisStorage
+from utils.validate_url import validate_url
+import globals
+import streamlit as st
 
 
 router = Router()
@@ -53,7 +56,7 @@ async def handle_null(message: types.Message, state: FSMContext):
 async def handle_company_name(message: types.Message, state: FSMContext, bot: Bot):
     company_name = message.text
     await state.update_data(company_name=company_name)
-    # TODO
+    # TODO bot name
     try:
         await bot.set_my_name(f"{company_name} FAQ")
     except Exception as e: 
@@ -64,6 +67,7 @@ async def handle_company_name(message: types.Message, state: FSMContext, bot: Bo
         await message.answer("Please, enter the company url:", reply_markup=ReplyKeyboardRemove())
     else:
         await state.set_state(Form.settings)
+        await handle_settings(message, state)
 
 
 @router.message(Form.company_url, F.text)
@@ -74,17 +78,35 @@ async def handle_company_url(message: types.Message, state: FSMContext):
         await state.set_state(Form.default)
         await state.update_data(auth=False)
         await message.answer("Setup succeeded!", reply_markup=ReplyKeyboardRemove())
-        await message.answer("You can either parse url and then ask bot about a company or fix something in settings")
+        await message.answer("You can either gather company info and then ask bot about a company or fix something in settings")
         await handle_default(message, state)
     else: 
         await state.set_state(Form.settings)
+        await handle_settings(message, state)
     
 
 #########
-# default    
-@router.message(Form.default, F.text.lower() == "parse url")
-async def handle_parse_url(message: types.Message, state: FSMContext):
-    # TODO parsing url
+# default   
+@router.message(Form.default, F.text.lower() == "gather info")
+async def handle_gather_info(message: types.Message, state: FSMContext):
+    url = (await state.get_data()).get('company_url', None)
+    if not await validate_url(url): 
+        logging.warning(f"Can't validate company url: {url}")
+        
+    # TODO gather info  
+    try:
+        res = await globals.app.gather_info(url) 
+    except Exception as e: 
+        logging.error("Error gathering company info")
+        logging.exception(e)
+        await message.answer("Sorry, error gathering company info")
+        return
+    else: 
+        if not res:
+            logging.error("No results got from gathering info")
+            await message.answer("Sorry, no results gathering company info")
+            return
+    
     await message.answer("Url parsed successfully! You can go FAQ now", reply_markup=ReplyKeyboardRemove())
     await handle_default(message, state)
     
@@ -107,7 +129,7 @@ async def handle_default(message: types.Message, state: FSMContext):
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
 
-            [KeyboardButton(text="Parse URL"), KeyboardButton(text="FAQ")],
+            [KeyboardButton(text="Gather info"), KeyboardButton(text="FAQ")],
             [KeyboardButton(text="Settings")]
         ],
         resize_keyboard=True
@@ -124,18 +146,29 @@ async def handle_back_to_main_menu(message: types.Message, state: FSMContext):
     await state.set_state(Form.default)
     
     await handle_default(message, state)
-    
-    
-@router.message(Form.faq, F.voice)
-async def handle_voice_message(message: types.Message, state: FSMContext):
-    # TODO
-    pass
         
         
-@router.message(Form.faq, F.text)
-async def handle_text_message(message: types.Message, state: FSMContext):
-    # TODO
-    pass
+@router.message(Form.faq, F.text | F.voice)
+async def handle_faq(message: types.Message, state: FSMContext):
+    if F.voice: 
+        # TODO convert voice to text
+        pass
+    elif F.text:
+        question = message.text
+    
+    try:
+        ans = await globals.app.faq(question) 
+    except Exception as e: 
+        await message.answer("Sorry, error assisting you")
+        logging.exception(e)
+        return
+    
+    if not ans:
+        await message.answer("I can't breathe. Try gather company info first")
+        await message.answer("Use /back to leave")
+        return
+    
+    await message.answer(ans)
     
     
 ##########
@@ -144,14 +177,12 @@ async def handle_text_message(message: types.Message, state: FSMContext):
 async def handle_change_name(message: types.Message, state: FSMContext, bot: Bot):
     await state.set_state(Form.company_name)
     await message.answer("Please, enter new company name:")
-    await handle_company_name(message, state, bot)
     
        
 @router.message(Form.settings, F.text.lower() == "change url")
 async def handle_change_url(message: types.Message, state: FSMContext):
     await state.set_state(Form.company_url)
     await message.answer("Please, enter new company url:")
-    await handle_company_url(message, state)
     
     
 @router.message(Form.settings)
