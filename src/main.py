@@ -33,6 +33,6 @@ async def main():
 
 if __name__ == '__main__':
     if STREAMLIT_MODE:
-        os.system('streamlit run tests/streamlit_test/streamlit_app.py')
+        os.system('streamlit run src/tests/streamlit_test/streamlit_app.py')
     else:
         asyncio.run(main())

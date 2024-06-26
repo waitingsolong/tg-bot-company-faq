@@ -2,7 +2,7 @@ from openai_client.client import OpenAIClient
 from crawler.logic import run_crawlers, init_crawlers
 import logging 
 from typing import Optional
-from src.utils.clean_markdown_contents import clean_markdown_contents
+from utils.clean_markdown_contents import clean_markdown_contents
 from config import FIRECRAWL_API_KEY
 
 

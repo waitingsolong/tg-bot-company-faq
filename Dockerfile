@@ -10,7 +10,7 @@ ENV POETRY_NO_INTERACTION=1 \
 WORKDIR /app
 
 COPY pyproject.toml poetry.lock ./
-RUN --mount=type=cache,id=s/9e3aa2a3-53d6-408c-951c-33e28b146d5f-$POETRY_CACHE_DIR,target=$POETRY_CACHE_DIR poetry install --without dev --no-root
+RUN --mount=type=cache,id=s/dc048e03-703a-4f6d-8aca-3826e891d42a-$POETRY_CACHE_DIR,target=$POETRY_CACHE_DIR poetry install --no-root
 
 FROM python:3.11-slim-buster as runtime
 

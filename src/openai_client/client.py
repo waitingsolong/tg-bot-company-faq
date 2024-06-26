@@ -1,4 +1,4 @@
-import src.logs
+import logs
 import logging
 from langchain_openai import ChatOpenAI
 from typing import List
@@ -10,8 +10,8 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.output_parsers import StrOutputParser
 from langchain import hub
 from langchain_community.callbacks.manager import get_openai_callback
-from src.utils.logged_token_usage import log_token_usage
-from src.utils.logged_step import logged_step
+from utils.logged_token_usage import log_token_usage
+from utils.logged_step import logged_step
 from langchain.schema import Document
 
 

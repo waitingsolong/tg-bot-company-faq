@@ -1,16 +1,16 @@
-import src.logs
+import logs
 import streamlit as st
-from src.openai_client.client import OpenAIClient
-from src.crawler.logic import run_crawlers, init_crawlers
+from openai_client.client import OpenAIClient
+from crawler.logic import run_crawlers, init_crawlers
 import logging
-from src.utils.clean_markdown_contents import clean_markdown_contents
-from src.config import FIRECRAWL_API_KEY
+from utils.clean_markdown_contents import clean_markdown_contents
+from config import FIRECRAWL_API_KEY
 from typing import Optional
 import asyncio
 import streamlit as st
 import copy
 
-from src.utils.diff import generate_diff_html 
+from utils.diff import generate_diff_html 
 
 openai_client = None
 crawlers = None

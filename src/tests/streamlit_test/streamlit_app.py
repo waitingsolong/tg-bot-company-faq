@@ -1,10 +1,8 @@
-import src.logs
+import logs
 import logging
 import streamlit as st
 import asyncio
-import warnings
 from gather_info import initialize, gather_info_streamlit, faq_streamlit
-from src.config import OPENAI_API_KEY
 
 # Initialize OpenAI API
 initialize()

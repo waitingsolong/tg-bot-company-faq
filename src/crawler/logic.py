@@ -1,5 +1,5 @@
-from src.crawler.crawler import FirecrawlCrawler, FAQCrawler
-from src.openai_client.client import OpenAIClient
+from crawler.crawler import FirecrawlCrawler, FAQCrawler
+from openai_client.client import OpenAIClient
 import asyncio
 
 

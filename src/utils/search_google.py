@@ -1,6 +1,6 @@
 import serpapi
 from .logged_step import logged_step
-from src.config import SERPAPI_API_KEY
+from config import SERPAPI_API_KEY
 
 
 client = serpapi.Client(api_key=SERPAPI_API_KEY)

@@ -13,14 +13,19 @@ from redis.asyncio.client import Redis
 from aiogram.fsm.storage.redis import RedisStorage
 from utils.validate_url import validate_url
 import globals
-from config import AUTH_KEY
+from config import AUTH_KEY, REDIS, REDIS_BY_PRIVATE, REDIS_PRIVATE_URL, REDIS_PORT, REDIS_HOST
 
 
 router = Router()
 storage = None
-if DEBUG:
+if REDIS:
     logging.info("Using redis as storage")
-    redis_client = Redis()
+    redis_client = None
+    if REDIS_BY_PRIVATE:
+        redis_client = Redis().from_url(REDIS_PRIVATE_URL)
+    else:
+        redis_client = Redis(port=REDIS_PORT, host=REDIS_HOST)
+    
     storage = RedisStorage(redis_client)
 else:
     logging.info("Using memory storage as storage")
