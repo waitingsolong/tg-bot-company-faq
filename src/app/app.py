@@ -4,7 +4,6 @@ import logging
 from typing import Optional
 from src.utils.clean_markdown_contents import clean_markdown_contents
 from config import FIRECRAWL_API_KEY
-import streamlit as st
 
 
 class App():
@@ -16,8 +15,6 @@ class App():
         self.__crawlers = init_crawlers(openai_client, firecrawl_api_keys)
         
         
-    # TODO gather info
-    @st.cache_data(ttl=300)
     async def gather_info(self, url: str) -> bool:
         """
         Run crawlers, add results to vector stores
@@ -47,10 +44,12 @@ class App():
             if result["exception"]:
                 err_crawls += 1
                 logging.info(f"Error: {result['exception']}")
-            else:
+            elif result['crawl_result']:
                 succ_crawls += 1
                 crawl_result = result['crawl_result']
-                logging.info(f"Success! Result's url: {result['crawl_result'][0]}")
+                logging.info(f"Success! Result's urls:\n{[url_content[0] for url_content in result['crawl_result']]}")
+            else: 
+                logging.error("Undefined crawl result")
         
         logging.info(f"From {len(results)} crawlers: {succ_crawls} succeed, {err_crawls} failed")
         
@@ -58,15 +57,16 @@ class App():
             logging.error("No results got from crawlers")
             return False
         
-        documents = [url_content[1] for url_content in crawl_result]
         
         ###############
-        # HAND CLEANING
-        docs_size_before = sum([len(d) for d in documents])
-        logging.info(f"Content before hand cleanup:\n{documents}")
+        # HAND CLEANING        
+        documents_before = [url_content[1] for url_content in crawl_result]
+        docs_size_before = sum([len(d) for d in documents_before])
+        
+        logging.info(f"Content before hand cleanup:\n{documents_before}")
         try:
             logging.info("Hand cleaning started") 
-            documents = clean_markdown_contents(documents)
+            documents = clean_markdown_contents(documents_before)
             logging.info("Hand cleaning completed")    
         except Exception as e: 
             logging.error("Hand cleaning failed with error")
@@ -96,9 +96,6 @@ class App():
             raise e 
         logging.info(f"All size before: {docs_size_before}, all size after: {sum([len(d) for d in document])}")
         
-        # TODO
-        return
-        
         ##############
         # VECTOR STORE 
         try:
@@ -111,16 +108,19 @@ class App():
         
         self.__able_to_faq = True
         logging.info("Gathering company info ended")
+        return True
         
     
     async def faq(self, question: str) -> Optional[str]: 
         if not self.__able_to_faq:
+            logging.info("Not able to faq")
             return None
         
         try: 
-            await self.__openai_client.rag(question)
+            return await self.__openai_client.rag(question)
         except Exception as e: 
             logging.error("Error FAQing")
-            raise e
+            logging.exception(e)
+            return None 
         
     

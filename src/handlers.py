@@ -13,7 +13,7 @@ from redis.asyncio.client import Redis
 from aiogram.fsm.storage.redis import RedisStorage
 from utils.validate_url import validate_url
 import globals
-import streamlit as st
+from config import AUTH_KEY
 
 
 router = Router()
@@ -28,6 +28,7 @@ else:
 
 
 class Form(StatesGroup):
+    auth = State()
     company_name = State()
     company_url = State()
     default = State()
@@ -47,9 +48,19 @@ async def handle_start_command(message: types.Message, state: FSMContext):
     
 @router.message(StateFilter(None))
 async def handle_null(message: types.Message, state: FSMContext):
-    await state.set_state(Form.company_name)
+    await state.set_state(Form.auth)
     await message.answer("Welcome! Let's come to setup process")
-    await message.answer("Please, enter the company name:")
+    await message.answer("Please, enter the auth key:")
+
+
+@router.message(Form.auth, F.text)
+async def handle_auth(message: types.Message, state: FSMContext, bot: Bot):
+    auth_key = message.text
+    if not auth_key.strip() == AUTH_KEY:
+        await message.answer("Wrong auth key. Reenter:")
+    else:
+        await state.set_state(Form.company_name)
+        await message.answer("Cool! Enter the company name:")
 
 
 @router.message(Form.company_name, F.text)
@@ -150,11 +161,11 @@ async def handle_back_to_main_menu(message: types.Message, state: FSMContext):
         
 @router.message(Form.faq, F.text | F.voice)
 async def handle_faq(message: types.Message, state: FSMContext):
-    if F.voice: 
-        # TODO convert voice to text
-        pass
-    elif F.text:
+    if message.text:
         question = message.text
+    elif message.voice:
+        # TODO: Convert voice message to text
+        pass
     
     try:
         ans = await globals.app.faq(question) 

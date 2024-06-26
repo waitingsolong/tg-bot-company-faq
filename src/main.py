@@ -1,9 +1,9 @@
 import logs
 import asyncio
 import logging
-
+import os
 from aiogram import Bot, Dispatcher
-from config import TELEGRAM_BOT_TOKEN
+from config import TELEGRAM_BOT_TOKEN, OPENAI_API_KEY, STREAMLIT_MODE
 from config import OPENAI_API_KEY
 from openai_client.client import OpenAIClient
 from app.app import App
@@ -12,7 +12,7 @@ import globals
 
 async def main():
     global openai_client 
-    openai_client = OpenAIClient(api_key=OPENAI_API_KEY)
+    openai_client = OpenAIClient()
     
     globals.app = App(openai_client)
         
@@ -32,4 +32,7 @@ async def main():
     
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    if STREAMLIT_MODE:
+        os.system('streamlit run tests/streamlit_test/streamlit_app.py')
+    else:
+        asyncio.run(main())

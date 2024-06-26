@@ -1,5 +1,5 @@
 import logging
-from config import DEBUG
+from src.config import DEBUG
 
 
 def init_logs():

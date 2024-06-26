@@ -7,7 +7,7 @@ def logged_step(step_name: str):
             try:
                 result = func(*args, **kwargs)
                 if not result:
-                    logging.error(f"{step_name}: null result")
+                    logging.info(f"{step_name}: null result")
                     
                 return result
             except Exception as e:

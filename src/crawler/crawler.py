@@ -3,7 +3,7 @@ from typing import List, Tuple
 import asyncio
 import logging
 from firecrawl import FirecrawlApp
-from openai_client.client import OpenAIClient
+from src.openai_client.client import OpenAIClient
 
 
 class FAQCrawler(ABC):
