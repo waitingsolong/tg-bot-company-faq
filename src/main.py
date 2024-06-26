@@ -8,7 +8,7 @@ from config import OPENAI_API_KEY
 from openai_client.client import OpenAIClient
 from app.app import App
 import globals
-    
+
 
 async def main():
     global openai_client 

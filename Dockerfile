@@ -1,4 +1,4 @@
-FROM python:3.11-buster as builder
+FROM python:3.11-bookworm as builder
 
 RUN pip install poetry==1.8.3
 
@@ -10,9 +10,11 @@ ENV POETRY_NO_INTERACTION=1 \
 WORKDIR /app
 
 COPY pyproject.toml poetry.lock ./
-RUN --mount=type=cache,id=s/dc048e03-703a-4f6d-8aca-3826e891d42a-$POETRY_CACHE_DIR,target=$POETRY_CACHE_DIR poetry install --no-root
+RUN --mount=type=cache,id=s/e642758f-83db-481a-a44b-0fe14773b2d2-$POETRY_CACHE_DIR,target=$POETRY_CACHE_DIR poetry install --no-root
 
-FROM python:3.11-slim-buster as runtime
+RUN .venv/bin/pip install pysqlite3-binary==0.5.3
+
+FROM python:3.11-bookworm as runtime
 
 ENV VIRTUAL_ENV=/app/.venv \
     PATH="/app/.venv/bin:$PATH"

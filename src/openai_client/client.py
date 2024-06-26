@@ -14,6 +14,10 @@ from utils.logged_token_usage import log_token_usage
 from utils.logged_step import logged_step
 from langchain.schema import Document
 
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 
 class OpenAIClient:
     input_1M_token_price = {
