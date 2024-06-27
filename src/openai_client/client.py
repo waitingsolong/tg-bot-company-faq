@@ -1,7 +1,10 @@
 import logs
+from pathlib import Path
+import uuid
+import aiofiles
 import logging
 from langchain_openai import ChatOpenAI
-from typing import List
+from typing import List, Optional
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough
 from langchain_text_splitters import CharacterTextSplitter
@@ -13,10 +16,13 @@ from langchain_community.callbacks.manager import get_openai_callback
 from utils.logged_token_usage import log_token_usage
 from utils.logged_step import logged_step
 from langchain.schema import Document
+from openai import AsyncOpenAI
+from config import AUDIO_DIR, DEBUG
 
-__import__('pysqlite3')
-import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+if not DEBUG:
+    __import__('pysqlite3')
+    import sys
+    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 
 class OpenAIClient:
@@ -29,6 +35,8 @@ class OpenAIClient:
     }
     
     vector_store_cost_per_gb_per_day = 0.0
+    whisperer_cost_per_sec = 0.0001
+    tts_cost_per_1k_input_chars = 0.015
 
     def __init__(self, model_name: str = "gpt-3.5-turbo-1106"):
         if model_name not in set(OpenAIClient.input_1M_token_price.keys()).union(OpenAIClient.output_1M_token_price.keys()):
@@ -37,6 +45,7 @@ class OpenAIClient:
                 
         self.__model_name = model_name
         self.__llm = ChatOpenAI(model_name=model_name)
+        self.__native_openai_client = AsyncOpenAI()
 
         self.__input_tokens = 0
         self.__output_tokens = 0
@@ -45,6 +54,8 @@ class OpenAIClient:
         self.__delta_session_input_tokens = 0
         self.__delta_session_output_tokens = 0
         self.__vector_store_size_gb = 0.0
+        self.__whisperer_cost = 0.0
+        self.__tts_cost = 0.0
 
         # query chain 
         query_prompt_template = ChatPromptTemplate.from_template("{task}\n\nPrompt: {prompt}")
@@ -96,6 +107,52 @@ class OpenAIClient:
     
         return res
 
+    
+    async def whisperer(self, mp3_file_path: str) -> Optional[str]:
+        try:
+            with open(mp3_file_path, "rb") as audio_file:
+                translation = await self.__native_openai_client.audio.translations.create(
+                    model="whisper-1",
+                    file=audio_file,
+                    response_format="text"
+                )
+        except Exception as e:
+            logging.error("Whisperer: Error:")
+            logging.exception(e)
+            return None
+
+        duration_sec = int(Path(mp3_file_path).stat().st_size / 16000)  # Approximating duration from file size (16kbps)
+        cost = duration_sec * self.whisperer_cost_per_sec
+        self.__whisperer_cost += cost
+        logging.info(f"Whisperer: User said:\n{translation}\n\nCost: ${cost:.6f} (${self.__whisperer_cost:.6f} total)")
+            
+        return translation
+
+    async def tts(self, text: str) -> Optional[str]:
+        mp3_file_path = AUDIO_DIR / f"{uuid.uuid4().hex}.mp3"
+        
+        try:
+            async with self.__native_openai_client.audio.speech.with_streaming_response.create(
+                model="tts-1",
+                voice="onyx",
+                input=text
+            ) as response:
+                async with aiofiles.open(mp3_file_path, 'wb') as f:
+                    async for chunk in response.iter_bytes():
+                        await f.write(chunk)
+        except Exception as e:
+            logging.error("TTS: Error:")
+            logging.exception(e)
+            return None 
+        
+        if mp3_file_path.exists() and mp3_file_path.stat().st_size > 0:
+            cost = len(text) / 1000 * 0.015
+            self.__tts_cost += cost
+            logging.info(f"TTS: Cost: ${cost:.6f} (${self.__tts_cost:.6f} total)")
+            return mp3_file_path
+        else:
+            return None
+
 
     def calculate_cost(self) -> float:
         vector_store_cost = 0
@@ -103,7 +160,7 @@ class OpenAIClient:
             vector_store_cost = (self.__vector_store_size_gb - 1) * self.vector_store_cost_per_gb_per_day
             
         return self.calculate_inout_cost(self.__input_tokens, self.__output_tokens) + \
-            vector_store_cost
+            vector_store_cost + self.__whisperer_cost + self.__tts_cost
             
             
     def calculate_inout_cost(self, inp_tokens, out_tokens):

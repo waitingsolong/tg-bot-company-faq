@@ -8,6 +8,7 @@ __pycache__/
 #mine
 .vscode
 tmp
+temp
 
 # C extensions
 *.so

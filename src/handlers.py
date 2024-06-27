@@ -1,6 +1,8 @@
 import logging
+import os
+from pathlib import Path
 
-from config import DEBUG
+from config import AUDIO_DIR, DEBUG
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from aiogram import Bot, Router, types, F
 from aiogram.types import FSInputFile
@@ -128,7 +130,7 @@ async def handle_gather_info(message: types.Message, state: FSMContext):
     
        
 @router.message(Form.default, F.text.lower() == "faq")
-async def handle_faq(message: types.Message, state: FSMContext):
+async def handle_to_faq(message: types.Message, state: FSMContext):
     await state.set_state(Form.faq)
     await message.answer("Ask questions!", reply_markup=ReplyKeyboardRemove())
     await message.answer("Use /back to leave")
@@ -165,26 +167,53 @@ async def handle_back_to_main_menu(message: types.Message, state: FSMContext):
         
         
 @router.message(Form.faq, F.text | F.voice)
-async def handle_faq(message: types.Message, state: FSMContext):
+async def handle_faq(message: types.Message, state: FSMContext, bot: Bot):
+    openai_client = globals.app.get_openai_client()
+    question = None
     if message.text:
         question = message.text
     elif message.voice:
-        # TODO: Convert voice message to text
-        pass
+        voice = message.voice
+        logging.info(f"Speech to text")
+        voice_req_path = AUDIO_DIR / f"{voice.file_unique_id}.mp3"
+        await bot.download(voice, voice_req_path)
+        try: 
+            question = await openai_client.whisperer(voice_req_path)
+        finally:
+            if os.path.exists(voice_req_path):
+                os.remove(voice_req_path)
     
+    if not question:
+        await message.answer("I can't hear you")
+    
+    logging.info("FAQing")
     try:
         ans = await globals.app.faq(question) 
     except Exception as e: 
         await message.answer("Sorry, error assisting you")
         logging.exception(e)
         return
+    else:
+        if not ans:
+            logging.error(f"No faq return. The question:\n{question}")
+            await message.answer("I can't breathe. Try gather company info first")
+            await message.answer("Use /back to leave")
+            return    
     
-    if not ans:
-        await message.answer("I can't breathe. Try gather company info first")
-        await message.answer("Use /back to leave")
-        return
+    logging.info("Text to speech")
+    voice_ans_path = await openai_client.tts(ans)
+     
+    try:
+        if voice_ans_path is not None:
+            await message.reply_voice(voice=FSInputFile(voice_ans_path))
+        else:
+            logging.error(f"Failed to create voice message")
+            await message.reply("Sorry, I can't voice. My mom is in the room")
+            await message.reply(ans)
     
-    await message.answer(ans)
+    finally:
+        if os.path.exists(voice_ans_path):
+                os.remove(voice_ans_path)
     
     
 ##########

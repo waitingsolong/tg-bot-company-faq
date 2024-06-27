@@ -1,3 +1,4 @@
+import copy
 from openai_client.client import OpenAIClient 
 from crawler.logic import run_crawlers, init_crawlers
 import logging 
@@ -13,7 +14,11 @@ class App():
         
         firecrawl_api_keys = [FIRECRAWL_API_KEY]
         self.__crawlers = init_crawlers(openai_client, firecrawl_api_keys)
-        
+    
+    
+    def get_openai_client(self):
+        return self.__openai_client
+    
         
     async def gather_info(self, url: str) -> bool:
         """
@@ -55,8 +60,7 @@ class App():
         
         if not crawl_result: 
             logging.error("No results got from crawlers")
-            return False
-        
+            return False 
         
         ###############
         # HAND CLEANING        
@@ -71,7 +75,7 @@ class App():
         except Exception as e: 
             logging.error("Hand cleaning failed with error")
             raise e 
-        logging.info(f"Total size before: {docs_size_before}, after: {sum([len(d) for d in documents])}")
+        logging.info(f"Total size before hand: {docs_size_before}, after hand: {sum([len(d) for d in documents])}")
         logging.info(f"Content after hand cleanup:\n{documents}")
         
         ##################
@@ -81,20 +85,23 @@ class App():
         You need to clear the site content from unnecessary information, such as
         site footer, cookie policy, fields with errors, login fields, urls, etc. 
         """
-        docs_size_before = sum([len(d) for d in documents])
+        documents_before = copy.deepcopy(documents)
+        docs_size_before = sum([len(d) for d in documents_before])
+        documents = []
         try:
             logging.info("GPT cleaning started")
-            for document in documents: 
+            for document in documents_before: 
                 doc_size_before = len(document)
                 logging.info(f"Document before gpt cleaning:\n{document}")
-                await self.__openai_client.query(prompt=document, task=clean_task)
-                logging.info(f"Size before: {doc_size_before}, size after: {sum([len(d) for d in document])}")
-                logging.info(f"Document after gpt cleaning:\n{document}")
+                new_document = await self.__openai_client.query(prompt=document, task=clean_task)
+                documents.append(new_document)
+                logging.info(f"Size before: {doc_size_before}, size after: {len(new_document)}")
+                logging.info(f"Document after gpt cleaning:\n{new_document}")
             logging.info("GPT cleaning completed")    
         except Exception as e: 
             logging.error("GPT cleaning failed with error")
             raise e 
-        logging.info(f"All size before: {docs_size_before}, all size after: {sum([len(d) for d in document])}")
+        logging.info(f"Total size before GPT: {docs_size_before}, total size after GPT: {sum([len(d) for d in documents])}")
         
         ##############
         # VECTOR STORE 

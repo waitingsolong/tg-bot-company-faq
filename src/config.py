@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 from distutils.util import strtobool
 
@@ -18,3 +19,13 @@ REDIS_HOST = os.getenv("REDIS_HOST")
 REDIS_PORT = os.getenv("REDIS_PORT") 
 
 FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY") 
+
+
+TEMP_DIR = Path("temp")
+AUDIO_DIR = TEMP_DIR / "audio"
+PICS_DIR = TEMP_DIR / "pics"
+DATA_DIR = Path("data")
+os.makedirs(TEMP_DIR, exist_ok=True)
+os.makedirs(AUDIO_DIR, exist_ok=True)
+os.makedirs(PICS_DIR, exist_ok=True)
+os.makedirs(DATA_DIR, exist_ok=True)
